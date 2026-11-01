@@ -43,7 +43,8 @@ You don't even need the second shortcut: with the main keybind, just say **"slas
 
 **Recommended settings:**
 
-![Recommended settings](docs/recommended-settings.png)
+<img width="723" height="634" alt="Screenshot 2026-11-01 123653" src="https://github.com/user-attachments/assets/9e39daa2-5d4e-4f99-8df1-559085aed9e3" />
+
 
 It runs in the background, can launch automatically at startup, and has an optional floating widget so you can watch your voice being recorded, or hide it so it becomes a seamless part of your gameplay. It takes about 1–2 seconds to transcribe what you say and put it in game.
 
