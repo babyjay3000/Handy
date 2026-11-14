@@ -854,8 +854,8 @@ enum AfterPaste {
     Nothing,
     /// Send the message (Auto Submit).
     Submit(AutoSubmitKey),
-    /// Park the message for review: Shift+Escape, which the Chat Reviewer WoW
-    /// addon turns into "close chat but keep the message in a preview".
+    /// Review mode: press Enter to hand the text in the Chat Reviewer addon's
+    /// capture field over to its preview (it isn't sent).
     Park,
 }
 
@@ -871,7 +871,7 @@ impl AfterPaste {
                 Ok(true)
             }
             AfterPaste::Park => {
-                send_park_message(enigo)?;
+                tap_key(enigo, Key::Return)?;
                 Ok(true)
             }
         }
@@ -890,15 +890,24 @@ fn tap_key(enigo: &mut Enigo, key: Key) -> Result<(), String> {
         .map_err(|e| format!("Failed to release {:?}: {}", key, e))
 }
 
-/// Shift+Escape: closes chat while the Chat Reviewer addon keeps the message.
-fn send_park_message(enigo: &mut Enigo) -> Result<(), String> {
+/// Lets go of Ctrl, Alt, Shift and Windows/Cmd for the game. You may still be
+/// holding one (a shortcut, or sprinting); without this the game would see
+/// e.g. Shift+Enter instead of Enter.
+fn release_held_modifiers(enigo: &mut Enigo) {
+    for modifier in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
+        let _ = enigo.key(modifier, Direction::Release);
+    }
+}
+
+/// Presses Ctrl+Shift+`key` (the Chat Reviewer addon's keybindings).
+fn press_ctrl_shift(enigo: &mut Enigo, key: Key) -> Result<(), String> {
     enigo
-        .key(Key::Shift, Direction::Press)
-        .map_err(|e| format!("Failed to press Shift: {}", e))?;
-    let result = tap_key(enigo, Key::Escape);
-    enigo
-        .key(Key::Shift, Direction::Release)
-        .map_err(|e| format!("Failed to release Shift: {}", e))?;
+        .key(Key::Control, Direction::Press)
+        .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
+    let _ = enigo.key(Key::Shift, Direction::Press);
+    let result = tap_key(enigo, key);
+    let _ = enigo.key(Key::Shift, Direction::Release);
+    let _ = enigo.key(Key::Control, Direction::Release);
     result
 }
 
@@ -917,17 +926,8 @@ fn press_review_binding(app_handle: &AppHandle, key: Key, what: &'static str) {
         let result = with_enigo(&app, move |enigo| {
             // The shortcut that triggered this may still be held. Release its
             // modifiers so the game sees exactly Ctrl+Shift+key.
-            for modifier in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
-                let _ = enigo.key(modifier, Direction::Release);
-            }
-            enigo
-                .key(Key::Control, Direction::Press)
-                .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
-            let _ = enigo.key(Key::Shift, Direction::Press);
-            let result = tap_key(enigo, key);
-            let _ = enigo.key(Key::Shift, Direction::Release);
-            let _ = enigo.key(Key::Control, Direction::Release);
-            result
+            release_held_modifiers(enigo);
+            press_ctrl_shift(enigo, key)
         });
         match result {
             Ok(()) => info!("Review: {what} parked message"),
@@ -957,6 +957,9 @@ struct OpenSequence {
     key: OpenInputFieldKey,
     delay_ms: u64,
     clear: bool,
+    /// Review mode: open the Chat Reviewer addon's invisible capture field
+    /// (Ctrl+Shift+F10) instead of the game's chat box.
+    capture: bool,
 }
 
 impl OpenSequence {
@@ -972,15 +975,23 @@ impl OpenSequence {
             PasteMode::Normal if settings.open_input_field => settings.open_input_field_key,
             PasteMode::Normal => return None,
         };
+        let capture = settings.review_before_sending;
         Some(OpenSequence {
             key,
             delay_ms: settings.open_input_field_delay_ms.min(300),
-            clear: settings.open_input_field_clear,
+            // The capture field always gets cleared of stray keys.
+            clear: settings.open_input_field_clear || capture,
+            capture,
         })
     }
 
     fn send(&self, enigo: &mut Enigo) -> Result<(), String> {
-        tap_key(enigo, open_input_field_key(self.key))?;
+        release_held_modifiers(enigo);
+        if self.capture {
+            press_ctrl_shift(enigo, Key::F10)?;
+        } else {
+            tap_key(enigo, open_input_field_key(self.key))?;
+        }
 
         if self.delay_ms > 0 {
             std::thread::sleep(Duration::from_millis(self.delay_ms));

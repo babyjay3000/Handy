@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
 import { useSettings } from "../../hooks/useSettings";
-import type { OverlayPosition, OverlayStyle } from "@/bindings";
+import type { OverlayPosition, OverlayStyle, OverlayTheme } from "@/bindings";
 
 interface ShowOverlayProps {
   descriptionMode?: "inline" | "tooltip";
@@ -40,6 +40,19 @@ export const ShowOverlay: React.FC<ShowOverlayProps> = React.memo(
         label: t("settings.advanced.overlay.position.options.top"),
       },
     ];
+
+    const themeOptions = [
+      {
+        value: "default",
+        label: t("settings.advanced.overlay.theme.options.default"),
+      },
+      {
+        value: "classic",
+        label: t("settings.advanced.overlay.theme.options.classic"),
+      },
+    ];
+    const selectedTheme = (getSetting("overlay_theme") ||
+      "default") as OverlayTheme;
 
     const selectedStyle = (getSetting("overlay_style") ||
       "live") as OverlayStyle;
@@ -80,6 +93,24 @@ export const ShowOverlay: React.FC<ShowOverlayProps> = React.memo(
                 updateSetting("overlay_position", value as OverlayPosition)
               }
               disabled={isUpdating("overlay_position")}
+            />
+          </SettingContainer>
+        )}
+
+        {selectedStyle !== "none" && (
+          <SettingContainer
+            title={t("settings.advanced.overlay.theme.title")}
+            description={t("settings.advanced.overlay.theme.description")}
+            descriptionMode={descriptionMode}
+            grouped={grouped}
+          >
+            <Dropdown
+              options={themeOptions}
+              selectedValue={selectedTheme}
+              onSelect={(value) =>
+                updateSetting("overlay_theme", value as OverlayTheme)
+              }
+              disabled={isUpdating("overlay_theme")}
             />
           </SettingContainer>
         )}

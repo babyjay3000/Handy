@@ -97,6 +97,19 @@ export const OpenInputField: React.FC<OpenInputFieldProps> = React.memo(
               descriptionMode={descriptionMode}
               grouped={grouped}
             />
+            <ToggleSwitch
+              checked={getSetting("game_shortcuts_ignore_modifiers") ?? false}
+              onChange={(value) =>
+                updateSetting("game_shortcuts_ignore_modifiers", value)
+              }
+              isUpdating={isUpdating("game_shortcuts_ignore_modifiers")}
+              label={t("settings.advanced.openInputField.ignoreModifiersTitle")}
+              description={t(
+                "settings.advanced.openInputField.ignoreModifiersDescription",
+              )}
+              descriptionMode={descriptionMode}
+              grouped={grouped}
+            />
             <ShortcutInput
               shortcutId="transcribe_slash_command"
               descriptionMode={descriptionMode}

@@ -230,6 +230,18 @@ pub enum OpenInputFieldKey {
     Slash,
 }
 
+/// Look of the recording overlay (applies to both Minimal and Live).
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum OverlayTheme {
+    /// Handy's own look, following the app theme.
+    #[default]
+    Default,
+    /// Dark panel, gold trim and serif lettering, in the style of classic
+    /// fantasy MMO interfaces.
+    Classic,
+}
+
 /// How the transcription's capitalization is adjusted before it is inserted.
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
@@ -516,6 +528,10 @@ pub struct AppSettings {
     pub slash_command_digits: bool,
     #[serde(default)]
     pub review_before_sending: bool,
+    #[serde(default)]
+    pub game_shortcuts_ignore_modifiers: bool,
+    #[serde(default)]
+    pub overlay_theme: OverlayTheme,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
     #[serde(default = "default_post_process_provider_id")]
@@ -1112,6 +1128,8 @@ pub fn get_default_settings() -> AppSettings {
         capitalization: CapitalizationMode::default(),
         slash_command_digits: default_slash_command_digits(),
         review_before_sending: false,
+        game_shortcuts_ignore_modifiers: false,
+        overlay_theme: OverlayTheme::default(),
         post_process_enabled: default_post_process_enabled(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
@@ -1507,6 +1525,56 @@ pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeri
     settings.recording_retention_period
 }
 
+/// Shortcuts the "ignore Ctrl/Alt/Shift" option applies to: recording and
+/// sending, the ones used mid-game while other keys may be held.
+pub const MODIFIER_TOLERANT_BINDINGS: [&str; 4] = [
+    "transcribe",
+    "transcribe_with_post_process",
+    "transcribe_slash_command",
+    "submit_reviewed_message",
+];
+
+/// The key combinations to listen for for a binding. With "ignore Ctrl/Alt/
+/// Shift" on, a recording or sending shortcut also fires with any of those
+/// held, by listening for each extra combination too ("pagedown",
+/// "shift+pagedown", "ctrl+alt+pagedown", ...).
+pub fn binding_hotkey_variants(binding: &ShortcutBinding, settings: &AppSettings) -> Vec<String> {
+    let base = binding.current_binding.clone();
+    let mut variants = vec![base.clone()];
+    if !settings.game_shortcuts_ignore_modifiers
+        || !MODIFIER_TOLERANT_BINDINGS.contains(&binding.id.as_str())
+    {
+        return variants;
+    }
+    #[cfg(target_os = "macos")]
+    const ALT: &str = "option";
+    #[cfg(not(target_os = "macos"))]
+    const ALT: &str = "alt";
+    let parts: Vec<String> = base.split('+').map(|p| p.trim().to_lowercase()).collect();
+    let has = |names: &[&str]| parts.iter().any(|p| names.contains(&p.as_str()));
+    let mut missing: Vec<&str> = Vec::new();
+    if !has(&["ctrl", "control"]) {
+        missing.push("ctrl");
+    }
+    if !has(&["alt", "option", "opt"]) {
+        missing.push(ALT);
+    }
+    if !has(&["shift"]) {
+        missing.push("shift");
+    }
+    // Every non-empty combination of the missing modifiers.
+    for mask in 1..(1u32 << missing.len()) {
+        let extra: Vec<&str> = missing
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| mask & (1 << i) != 0)
+            .map(|(_, m)| *m)
+            .collect();
+        variants.push(format!("{}+{}", extra.join("+"), base));
+    }
+    variants
+}
+
 /// Game-chat shortcuts that only exist while their feature is switched on.
 /// Returns false for those that should currently stay unregistered.
 pub fn is_game_binding_active(id: &str, settings: &AppSettings) -> bool {
@@ -1520,6 +1588,43 @@ pub fn is_game_binding_active(id: &str, settings: &AppSettings) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn hotkey_variants_add_missing_modifiers_only_when_enabled() {
+        let mut settings = get_default_settings();
+        let binding = ShortcutBinding {
+            id: "submit_reviewed_message".into(),
+            name: String::new(),
+            description: String::new(),
+            default_binding: "pagedown".into(),
+            current_binding: "pagedown".into(),
+        };
+        assert_eq!(
+            binding_hotkey_variants(&binding, &settings),
+            vec!["pagedown"]
+        );
+
+        settings.game_shortcuts_ignore_modifiers = true;
+        let v = binding_hotkey_variants(&binding, &settings);
+        assert_eq!(v.len(), 8); // pagedown + 7 combinations of ctrl/alt/shift
+        assert!(v.contains(&"shift+pagedown".to_string()));
+        assert!(v.contains(&"ctrl+shift+pagedown".to_string()));
+
+        let with_ctrl = ShortcutBinding {
+            current_binding: "ctrl+space".into(),
+            id: "transcribe".into(),
+            ..binding.clone()
+        };
+        let v = binding_hotkey_variants(&with_ctrl, &settings);
+        assert_eq!(v.len(), 4); // already has ctrl: adds alt, shift, alt+shift
+        assert!(!v.iter().skip(1).any(|h| h.starts_with("ctrl+ctrl")));
+
+        let cancel = ShortcutBinding {
+            id: "cancel".into(),
+            ..binding
+        };
+        assert_eq!(binding_hotkey_variants(&cancel, &settings).len(), 1);
+    }
 
     #[test]
     fn stored_binding_returns_the_requested_binding() {

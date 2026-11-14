@@ -407,3 +407,73 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ============================================================
+   Classic theme (Settings → Overlay Theme → Classic): a classic fantasy MMO
+   look for both the Minimal pill and the Live panel. Dark translucent panel,
+   gold double trim, gold accents, serif lettering with a dark drop shadow.
+   CSS only; the trim is inset so the card's footprint (and the native overlay
+   window sized from it) doesn't change.
+   ============================================================ */
+.ov-stage.theme-classic {
+  --s-font:
+    "Friz Quadrata TT", "Friz Quadrata", "Palatino Linotype", "Book Antiqua",
+    Palatino, Georgia, serif;
+  --s-surface: rgba(6, 6, 10, 0.86);
+  --s-accent: #ffd100;
+  --s-accent-soft: rgba(255, 209, 0, 0.2);
+  --s-muted: #c9b37e;
+  --s-faint: #a08c5c;
+  --s-border: #c9a24a;
+  --s-hair: rgba(255, 209, 0, 0.12);
+  --color-text: #f2e8cf;
+}
+.ov-stage.theme-classic .scard,
+.ov-stage.theme-classic .scard.open,
+.ov-stage.theme-classic .scard.working {
+  border-radius: 6px;
+  background:
+    radial-gradient(ellipse at top, rgba(64, 48, 18, 0.45), transparent 70%),
+    var(--s-surface);
+  border: 1px solid var(--s-border);
+  /* Inner black line + faint inner gold line: a double trim without growing
+     the card. */
+  box-shadow:
+    inset 0 0 0 1px #000,
+    inset 0 0 0 2px rgba(201, 162, 74, 0.35);
+  text-shadow: 1px 1px 0 #000;
+}
+.ov-stage.theme-classic .stext-cap {
+  font-style: normal;
+  letter-spacing: 0.2px;
+}
+.ov-stage.theme-classic .stext-cap .committed {
+  color: var(--color-text);
+}
+.ov-stage.theme-classic .stext-cap .tentative {
+  color: var(--s-muted);
+}
+.ov-stage.theme-classic .swave i {
+  background: linear-gradient(to top, #8a6a1c, #ffd100);
+}
+.ov-stage.theme-classic .swave.arming i {
+  background: var(--s-muted);
+}
+.ov-stage.theme-classic .swork-label,
+.ov-stage.theme-classic .stimer {
+  color: var(--s-accent);
+  letter-spacing: 0.4px;
+}
+.ov-stage.theme-classic .sx {
+  background: rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 0 1px #6b5420;
+  color: var(--s-muted);
+}
+.ov-stage.theme-classic .sx:hover {
+  background: rgba(255, 209, 0, 0.15);
+  color: var(--s-accent);
+}
+.ov-stage.theme-classic .sspinner {
+  border-color: rgba(255, 209, 0, 0.15);
+  border-top-color: var(--s-accent);
+}

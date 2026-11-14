@@ -1111,6 +1111,50 @@ pub fn change_review_before_sending_setting(app: AppHandle, enabled: bool) -> Re
     Ok(())
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn change_overlay_theme_setting(app: AppHandle, theme: String) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.overlay_theme = match theme.as_str() {
+        "classic" => settings::OverlayTheme::Classic,
+        "default" => settings::OverlayTheme::Default,
+        other => {
+            warn!("Invalid overlay theme '{}', using default", other);
+            settings::OverlayTheme::Default
+        }
+    };
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_game_shortcuts_ignore_modifiers_setting(
+    app: AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.game_shortcuts_ignore_modifiers = enabled;
+    settings::write_settings(&app, settings.clone());
+
+    // Re-register the recording and sending shortcuts so the extra Ctrl/Alt/
+    // Shift combinations are added or removed.
+    for id in settings::MODIFIER_TOLERANT_BINDINGS {
+        let active = settings::is_game_binding_active(id, &settings)
+            && (id != "transcribe_with_post_process" || settings.post_process_enabled);
+        if !active {
+            continue;
+        }
+        if let Some(binding) = settings.bindings.get(id).cloned() {
+            let _ = unregister_shortcut(&app, binding.clone());
+            if let Err(e) = register_shortcut(&app, binding) {
+                warn!("Failed to re-register shortcut {}: {}", id, e);
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Registers or unregisters the game-chat shortcuts (slash command, submit
 /// reviewed message) whose feature was just switched on or off.
 fn sync_game_bindings(

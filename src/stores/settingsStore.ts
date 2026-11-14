@@ -169,6 +169,9 @@ const settingUpdaters: {
     commands.changeOpenInputFieldDelayMsSetting(value as number),
   open_input_field_clear: (value) =>
     commands.changeOpenInputFieldClearSetting(value as boolean),
+  game_shortcuts_ignore_modifiers: (value) =>
+    commands.changeGameShortcutsIgnoreModifiersSetting(value as boolean),
+  overlay_theme: (value) => commands.changeOverlayThemeSetting(value as string),
   review_before_sending: (value) =>
     commands.changeReviewBeforeSendingSetting(value as boolean),
   slash_command_digits: (value) =>

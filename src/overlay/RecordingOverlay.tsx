@@ -58,6 +58,8 @@ const RecordingOverlay: React.FC = () => {
   // Overlay placement (top vs bottom of the screen). The Live panel grows downward
   // from a top overlay (oldest line under the pill) and upward from a bottom one.
   const [position, setPosition] = useState<"top" | "bottom">("bottom");
+  // Optional look: "classic" gives the overlay a classic fantasy MMO style.
+  const [theme, setTheme] = useState<"default" | "classic">("default");
   // True once live text overflows the cap. A top overlay fades its top edge only
   // while overflowing, so the resting first line stays crisp flush under the pill.
   const [overflowing, setOverflowing] = useState(false);
@@ -92,6 +94,9 @@ const RecordingOverlay: React.FC = () => {
           if (settings.status === "ok") {
             setPosition(
               settings.data.overlay_position === "top" ? "top" : "bottom",
+            );
+            setTheme(
+              settings.data.overlay_theme === "classic" ? "classic" : "default",
             );
           }
         } catch {
@@ -301,7 +306,7 @@ const RecordingOverlay: React.FC = () => {
     const collapsed = working && !hasText;
 
     return (
-      <div dir={direction} className={`ov-stage ${position}`}>
+      <div dir={direction} className={`ov-stage ${position} theme-${theme}`}>
         <div
           key={session}
           className={`scard ${open ? "open" : ""} ${collapsed ? "working" : ""} ${
@@ -355,7 +360,9 @@ const RecordingOverlay: React.FC = () => {
   return (
     <div
       dir={direction}
-      className={`ov-stage ${position} ov-fade ${isVisible ? "show" : ""}`}
+      className={`ov-stage ${position} theme-${theme} ov-fade ${
+        isVisible ? "show" : ""
+      }`}
     >
       <div
         className={`scard compact ${working && isVisible ? "cworking" : ""}`}
