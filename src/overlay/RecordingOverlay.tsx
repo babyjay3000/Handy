@@ -1,4 +1,5 @@
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import React, { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import "./RecordingOverlay.css";
@@ -12,8 +13,15 @@ import type {
 import i18n, { syncLanguageFromSettings } from "@/i18n";
 import type { ModelStateEvent } from "@/lib/types/events";
 import { getLanguageDirection } from "@/lib/utils/rtl";
+import { PixelSpeaker, wavesForLevels } from "./PixelSpeaker";
 
-type OverlayState = "recording" | "streaming" | "transcribing" | "processing";
+type OverlayState =
+  | "recording"
+  | "streaming"
+  | "transcribing"
+  | "processing"
+  // Shown from Settings so the overlay can be dragged to a new spot.
+  | "positioning";
 
 // Number of reactive bars in the waveform (the simple, smoothed style shared by
 // every overlay form). Mic levels arrive as 16 FFT buckets; we take the first N.
@@ -210,6 +218,21 @@ const RecordingOverlay: React.FC = () => {
     if (modelLoadSlow && state === "streaming") setLoadNoticeShown(true);
   }, [modelLoadSlow, state, session]);
 
+  // Classic theme: while transcribing, the pixel speaker's three dots fill in
+  // one at a time on a choppy, retro beat.
+  const [dotStep, setDotStep] = useState(1);
+  const classicWorking =
+    theme === "classic" &&
+    (state === "transcribing" ||
+      state === "processing" ||
+      (state === "streaming" && phase === "working"));
+  useEffect(() => {
+    if (!classicWorking) return;
+    setDotStep(1);
+    const timer = setInterval(() => setDotStep((d) => (d % 3) + 1), 220);
+    return () => clearInterval(timer);
+  }, [classicWorking]);
+
   // Each fresh streaming session starts pinned to the bottom, fade cleared.
   useEffect(() => {
     pinnedRef.current = true;
@@ -217,6 +240,16 @@ const RecordingOverlay: React.FC = () => {
   }, [session]);
 
   if (!isVisible) return null;
+
+  // While positioning (Settings → Move), the whole overlay is a drag handle.
+  const positioning = state === "positioning";
+  const dragProps = positioning
+    ? {
+        onMouseDown: (e: React.MouseEvent) => {
+          if (e.button === 0) void getCurrentWindow().startDragging();
+        },
+      }
+    : {};
 
   // Re-pin when the user is within ~a line of the bottom; unpin otherwise.
   const handleStreamScroll = () => {
@@ -289,6 +322,44 @@ const RecordingOverlay: React.FC = () => {
       <div className="sbase-r">{showCancel && cancelBtn}</div>
     </div>
   );
+
+  // ---- Classic theme: a lo-fi pixel speaker instead of the pill or panel.
+  // Its sound waves follow your voice; dots fill in while transcribing. In
+  // Live, the words appear beside it.
+  if (theme === "classic") {
+    const liveText =
+      state === "streaming"
+        ? [streamText.committed, streamText.tentative]
+            .filter((part) => part)
+            .join(" ")
+        : "";
+    return (
+      <div
+        dir={direction}
+        className={`ov-stage ${position} theme-classic ov-fade ${
+          isVisible ? "show" : ""
+        }`}
+      >
+        <div
+          className={`retro ${positioning ? "positioning" : ""}`}
+          {...dragProps}
+        >
+          <PixelSpeaker
+            waveCount={
+              positioning ? 3 : captureReady ? wavesForLevels(levels) : 0
+            }
+            dotCount={classicWorking ? dotStep : undefined}
+            dim={!positioning && !captureReady && !classicWorking}
+          />
+          {liveText && (
+            <div className="retro-text">
+              <span>{liveText}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   // ---- Live overlay: a pill that sculpts open into a panel ----
   if (state === "streaming") {
@@ -365,7 +436,10 @@ const RecordingOverlay: React.FC = () => {
       }`}
     >
       <div
-        className={`scard compact ${working && isVisible ? "cworking" : ""}`}
+        className={`scard compact ${working && isVisible ? "cworking" : ""} ${
+          positioning ? "positioning" : ""
+        }`}
+        {...dragProps}
       >
         {working ? workingRow(workLabel, true) : listeningRow(false, true)}
       </div>

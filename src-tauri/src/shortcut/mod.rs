@@ -1111,6 +1111,32 @@ pub fn change_review_before_sending_setting(app: AppHandle, enabled: bool) -> Re
     Ok(())
 }
 
+/// Shows the overlay so it can be dragged somewhere else.
+#[tauri::command]
+#[specta::specta]
+pub fn start_overlay_positioning(app: AppHandle) -> Result<(), String> {
+    crate::overlay::show_positioning_overlay(&app);
+    Ok(())
+}
+
+/// Saves where the overlay was dragged to and hides it.
+#[tauri::command]
+#[specta::specta]
+pub fn finish_overlay_positioning(app: AppHandle) -> Result<(), String> {
+    crate::overlay::save_overlay_custom_position(&app)
+}
+
+/// Goes back to the normal top/bottom placement.
+#[tauri::command]
+#[specta::specta]
+pub fn reset_overlay_position(app: AppHandle) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.overlay_custom_position = None;
+    settings::write_settings(&app, settings);
+    crate::utils::update_overlay_position(&app);
+    Ok(())
+}
+
 #[tauri::command]
 #[specta::specta]
 pub fn change_overlay_theme_setting(app: AppHandle, theme: String) -> Result<(), String> {

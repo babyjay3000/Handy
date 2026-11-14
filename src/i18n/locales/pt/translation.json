@@ -528,11 +528,18 @@
         },
         "theme": {
           "title": "Overlay Theme",
-          "description": "How the overlay looks. Classic gives it a dark panel with gold trim and serif lettering, in the style of classic fantasy MMOs. Works with Minimal and Live.",
+          "description": "How the overlay looks. Classic swaps it for a lo-fi pixel-art speaker whose sound waves follow your voice. Works with Minimal and Live.",
           "options": {
             "default": "Default",
             "classic": "Classic"
           }
+        },
+        "move": {
+          "title": "Overlay Location",
+          "description": "Click Move, drag the overlay wherever you like on screen, then click Done. Reset puts it back at the top or bottom.",
+          "start": "Move",
+          "done": "Done",
+          "reset": "Reset"
         }
       },
       "pasteMethod": {
@@ -582,7 +589,7 @@
         "delayTitle": "Input Field Delay",
         "delayDescription": "How long to wait (in milliseconds) after pressing the key before inserting text. Increase if the start of your message gets cut off or lands outside the chat box.",
         "ignoreModifiersTitle": "Shortcuts Ignore Ctrl/Alt/Shift",
-        "ignoreModifiersDescription": "Your recording, slash command and submit shortcuts still work while you're holding Ctrl, Alt or Shift (for example while sprinting or using a modifier keybind). Handy lets go of those keys for the game before typing.",
+        "ignoreModifiersDescription": "Your recording, slash command and submit shortcuts still work while you're holding Ctrl, Alt or Shift (for example while sprinting or using a modifier keybind). Your held keys are left alone. Works best with Review Before Sending.",
         "digitsTitle": "Slash Command Numbers as Digits",
         "digitsDescription": "When a slash command starts with a spoken number, type it as digits, so saying \"two LFG tank\" sends /2 lfg tank. Also catches common mishearings like \"to\" or \"for\".",
         "reviewTitle": "Review Before Sending",

@@ -230,6 +230,14 @@ pub enum OpenInputFieldKey {
     Slash,
 }
 
+/// Where the overlay was dragged to: the center of the overlay as a fraction
+/// (0-1) of the screen's width and height, so it holds across resolutions.
+#[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Type)]
+pub struct OverlayCustomPosition {
+    pub x: f64,
+    pub y: f64,
+}
+
 /// Look of the recording overlay (applies to both Minimal and Live).
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq, Type, Default)]
 #[serde(rename_all = "snake_case")]
@@ -532,6 +540,8 @@ pub struct AppSettings {
     pub game_shortcuts_ignore_modifiers: bool,
     #[serde(default)]
     pub overlay_theme: OverlayTheme,
+    #[serde(default)]
+    pub overlay_custom_position: Option<OverlayCustomPosition>,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
     #[serde(default = "default_post_process_provider_id")]
@@ -1130,6 +1140,7 @@ pub fn get_default_settings() -> AppSettings {
         review_before_sending: false,
         game_shortcuts_ignore_modifiers: false,
         overlay_theme: OverlayTheme::default(),
+        overlay_custom_position: None,
         post_process_enabled: default_post_process_enabled(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),

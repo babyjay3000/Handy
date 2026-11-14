@@ -53,12 +53,22 @@ const OVERLAY_HEIGHT: f64 = 50.0;
 const OVERLAY_STREAM_WIDTH: f64 = 400.0;
 const OVERLAY_STREAM_HEIGHT: f64 = 120.0;
 
-/// Overlay window size (logical) for a given UI state.
-fn overlay_dimensions(state: &str) -> (f64, f64) {
-    if state == "streaming" {
-        (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT)
-    } else {
-        (OVERLAY_WIDTH, OVERLAY_HEIGHT)
+// Classic theme (pixel speaker, see src/overlay/PixelSpeaker.tsx): the icon
+// is 120x84 plus 4px padding; Live adds up to ~290px of text beside it.
+const CLASSIC_WIDTH: f64 = 140.0;
+const CLASSIC_HEIGHT: f64 = 96.0;
+const CLASSIC_STREAM_WIDTH: f64 = 430.0;
+const CLASSIC_STREAM_HEIGHT: f64 = 100.0;
+
+/// Overlay window size (logical) for a given UI state and theme.
+fn overlay_dimensions(app_handle: &AppHandle, state: &str) -> (f64, f64) {
+    let classic =
+        settings::get_settings(app_handle).overlay_theme == settings::OverlayTheme::Classic;
+    match (state == "streaming", classic) {
+        (true, false) => (OVERLAY_STREAM_WIDTH, OVERLAY_STREAM_HEIGHT),
+        (false, false) => (OVERLAY_WIDTH, OVERLAY_HEIGHT),
+        (true, true) => (CLASSIC_STREAM_WIDTH, CLASSIC_STREAM_HEIGHT),
+        (false, true) => (CLASSIC_WIDTH, CLASSIC_HEIGHT),
     }
 }
 
@@ -256,6 +266,20 @@ fn calculate_overlay_position(
 
     let settings = settings::get_settings(app_handle);
 
+    // Dragged to a custom spot: center the overlay there, kept on screen.
+    if let Some(custom) = settings.overlay_custom_position {
+        let monitor_height = monitor.size().height as f64 / scale;
+        let x = (monitor_x + custom.x * monitor_width - width / 2.0).clamp(
+            monitor_x,
+            (monitor_x + monitor_width - width).max(monitor_x),
+        );
+        let y = (monitor_y + custom.y * monitor_height - height / 2.0).clamp(
+            monitor_y,
+            (monitor_y + monitor_height - height).max(monitor_y),
+        );
+        return Some((x, y));
+    }
+
     let x = monitor_x + (monitor_width - width) / 2.0;
     let y = match settings.overlay_position {
         OverlayPosition::Top => monitor_y + OVERLAY_TOP_OFFSET,
@@ -347,7 +371,7 @@ fn place_windows_overlay(
     let monitor = get_monitor_with_cursor(app_handle)
         .ok_or_else(|| "failed to determine the monitor containing the cursor".to_string())?;
     let text_scale = windows_text_scale_factor();
-    let (x, y, width, height) = windows_overlay_bounds(
+    let (mut x, mut y, width, height) = windows_overlay_bounds(
         *monitor.position(),
         *monitor.size(),
         monitor.scale_factor(),
@@ -356,6 +380,18 @@ fn place_windows_overlay(
         logical_height,
         settings::get_settings(app_handle).overlay_position,
     );
+    // Dragged to a custom spot: center the overlay there, kept on screen.
+    if let Some(custom) = settings::get_settings(app_handle).overlay_custom_position {
+        let (mx, my) = (monitor.position().x as f64, monitor.position().y as f64);
+        let (mw, mh) = (monitor.size().width as f64, monitor.size().height as f64);
+        x = (mx + custom.x * mw - width as f64 / 2.0)
+            .clamp(mx, (mx + mw - width as f64).max(mx))
+            .round() as i32;
+        y = (my + custom.y * mh - height as f64 / 2.0)
+            .clamp(my, (my + mh - height as f64).max(my))
+            .round() as i32;
+    }
+
     let hwnd = overlay_window
         .hwnd()
         .map_err(|error| format!("failed to get overlay window handle: {error}"))?;
@@ -509,7 +545,7 @@ fn show_overlay_state(app_handle: &AppHandle, state: &str) {
 
 fn show_overlay_state_on_main(app_handle: &AppHandle, state: &str) {
     // Size the overlay for this state (compact vs. streaming), then position it.
-    let (width, height) = overlay_dimensions(state);
+    let (width, height) = overlay_dimensions(app_handle, state);
     if let Some(overlay_window) = app_handle.get_webview_window("recording_overlay") {
         // Invalidate any delayed hide still in flight from a previous session
         // (see `hide_recording_overlay`).
@@ -657,7 +693,7 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
             } else {
                 "recording"
             };
-            let (width, height) = overlay_dimensions(state);
+            let (width, height) = overlay_dimensions(app_handle, state);
             if let Err(error) = place_windows_overlay(app_handle, &overlay_window, width, height) {
                 log::error!("Failed to update recording overlay position: {error}");
             }
@@ -686,6 +722,37 @@ fn update_overlay_position_on_main(app_handle: &AppHandle) {
 static OVERLAY_SHOW_GENERATION: AtomicU64 = AtomicU64::new(0);
 
 /// Hides the recording overlay window with fade-out animation
+/// Shows the overlay so it can be dragged to a new spot (Settings → Move).
+pub fn show_positioning_overlay(app_handle: &AppHandle) {
+    show_overlay_state(app_handle, "positioning");
+}
+
+/// Saves where the overlay was dragged (its center, as a fraction of the
+/// screen it's on) and hides it again.
+pub fn save_overlay_custom_position(app_handle: &AppHandle) -> Result<(), String> {
+    let window = app_handle
+        .get_webview_window("recording_overlay")
+        .ok_or("Overlay window not found")?;
+    let position = window.outer_position().map_err(|e| e.to_string())?;
+    let size = window.outer_size().map_err(|e| e.to_string())?;
+    let monitor = window
+        .current_monitor()
+        .map_err(|e| e.to_string())?
+        .ok_or("The overlay isn't on a screen")?;
+    let center_x = position.x as f64 + size.width as f64 / 2.0;
+    let center_y = position.y as f64 + size.height as f64 / 2.0;
+    let custom = settings::OverlayCustomPosition {
+        x: ((center_x - monitor.position().x as f64) / monitor.size().width as f64).clamp(0.0, 1.0),
+        y: ((center_y - monitor.position().y as f64) / monitor.size().height as f64)
+            .clamp(0.0, 1.0),
+    };
+    let mut current = settings::get_settings(app_handle);
+    current.overlay_custom_position = Some(custom);
+    settings::write_settings(app_handle, current);
+    hide_recording_overlay(app_handle);
+    Ok(())
+}
+
 pub fn hide_recording_overlay(app_handle: &AppHandle) {
     // Always hide the overlay regardless of settings - if setting was changed while recording,
     // we still want to hide it properly

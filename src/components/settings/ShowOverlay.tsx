@@ -1,7 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Dropdown } from "../ui/Dropdown";
 import { SettingContainer } from "../ui/SettingContainer";
+import { Button } from "../ui/Button";
+import { commands } from "@/bindings";
 import { useSettings } from "../../hooks/useSettings";
 import type { OverlayPosition, OverlayStyle, OverlayTheme } from "@/bindings";
 
@@ -13,7 +15,24 @@ interface ShowOverlayProps {
 export const ShowOverlay: React.FC<ShowOverlayProps> = React.memo(
   ({ descriptionMode = "tooltip", grouped = false }) => {
     const { t } = useTranslation();
-    const { getSetting, updateSetting, isUpdating } = useSettings();
+    const { getSetting, updateSetting, isUpdating, refreshSettings } =
+      useSettings();
+    const [moving, setMoving] = useState(false);
+    const hasCustomPosition = getSetting("overlay_custom_position") != null;
+
+    const startMoving = async () => {
+      await commands.startOverlayPositioning();
+      setMoving(true);
+    };
+    const finishMoving = async () => {
+      await commands.finishOverlayPositioning();
+      setMoving(false);
+      await refreshSettings();
+    };
+    const resetPosition = async () => {
+      await commands.resetOverlayPosition();
+      await refreshSettings();
+    };
 
     const styleOptions = [
       {
@@ -112,6 +131,32 @@ export const ShowOverlay: React.FC<ShowOverlayProps> = React.memo(
               }
               disabled={isUpdating("overlay_theme")}
             />
+          </SettingContainer>
+        )}
+
+        {selectedStyle !== "none" && (
+          <SettingContainer
+            title={t("settings.advanced.overlay.move.title")}
+            description={t("settings.advanced.overlay.move.description")}
+            descriptionMode={descriptionMode}
+            grouped={grouped}
+          >
+            <div className="flex gap-2">
+              {moving ? (
+                <Button size="sm" onClick={finishMoving}>
+                  {t("settings.advanced.overlay.move.done")}
+                </Button>
+              ) : (
+                <Button size="sm" variant="secondary" onClick={startMoving}>
+                  {t("settings.advanced.overlay.move.start")}
+                </Button>
+              )}
+              {hasCustomPosition && !moving && (
+                <Button size="sm" variant="ghost" onClick={resetPosition}>
+                  {t("settings.advanced.overlay.move.reset")}
+                </Button>
+              )}
+            </div>
           </SettingContainer>
         )}
       </>

@@ -854,8 +854,8 @@ enum AfterPaste {
     Nothing,
     /// Send the message (Auto Submit).
     Submit(AutoSubmitKey),
-    /// Review mode: press Enter to hand the text in the Chat Reviewer addon's
-    /// capture field over to its preview (it isn't sent).
+    /// Review mode with typed text: Enter hands it from the Chat Reviewer
+    /// addon's capture field to its preview (it isn't sent).
     Park,
 }
 
@@ -890,15 +890,6 @@ fn tap_key(enigo: &mut Enigo, key: Key) -> Result<(), String> {
         .map_err(|e| format!("Failed to release {:?}: {}", key, e))
 }
 
-/// Lets go of Ctrl, Alt, Shift and Windows/Cmd for the game. You may still be
-/// holding one (a shortcut, or sprinting); without this the game would see
-/// e.g. Shift+Enter instead of Enter.
-fn release_held_modifiers(enigo: &mut Enigo) {
-    for modifier in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
-        let _ = enigo.key(modifier, Direction::Release);
-    }
-}
-
 /// Presses Ctrl+Shift+`key` (the Chat Reviewer addon's keybindings).
 fn press_ctrl_shift(enigo: &mut Enigo, key: Key) -> Result<(), String> {
     enigo
@@ -923,12 +914,8 @@ fn press_review_binding(app_handle: &AppHandle, key: Key, what: &'static str) {
     let app = app_handle.clone();
     std::thread::spawn(move || {
         let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
-        let result = with_enigo(&app, move |enigo| {
-            // The shortcut that triggered this may still be held. Release its
-            // modifiers so the game sees exactly Ctrl+Shift+key.
-            release_held_modifiers(enigo);
-            press_ctrl_shift(enigo, key)
-        });
+        // Held keys are left alone: the addon also binds the Alt version.
+        let result = with_enigo(&app, move |enigo| press_ctrl_shift(enigo, key));
         match result {
             Ok(()) => info!("Review: {what} parked message"),
             Err(error) => log::warn!("Review: failed to {what} parked message: {error}"),
@@ -979,14 +966,14 @@ impl OpenSequence {
         Some(OpenSequence {
             key,
             delay_ms: settings.open_input_field_delay_ms.min(300),
-            // The capture field always gets cleared of stray keys.
-            clear: settings.open_input_field_clear || capture,
+            // The capture field keeps only the pasted text by itself, so it
+            // needs no Shift+Home.
+            clear: settings.open_input_field_clear && !capture,
             capture,
         })
     }
 
     fn send(&self, enigo: &mut Enigo) -> Result<(), String> {
-        release_held_modifiers(enigo);
         if self.capture {
             press_ctrl_shift(enigo, Key::F10)?;
         } else {
@@ -1163,6 +1150,13 @@ fn number_word_to_digits(word: &str) -> Option<String> {
     Some(digit.to_string())
 }
 
+fn paste_method_types_text(paste_method: PasteMethod) -> bool {
+    matches!(
+        paste_method,
+        PasteMethod::Direct | PasteMethod::ExternalScript
+    )
+}
+
 fn should_send_auto_submit(auto_submit: bool, paste_method: PasteMethod) -> bool {
     auto_submit && paste_method != PasteMethod::None
 }
@@ -1187,10 +1181,11 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
 
     let text = match mode {
         PasteMode::SlashCommand => {
-            // When the field is cleared, the `/` that opened it is wiped too,
-            // so it has to be part of the pasted text.
-            let cleared = open_sequence.map(|o| o.clear).unwrap_or(true);
-            slash_command_text(&text, cleared, settings.slash_command_digits)
+            // The `/` must be part of the pasted text when nothing typed it
+            // into the field: the field was cleared (wiping the `/` that
+            // opened it), or it's the Chat Reviewer capture field.
+            let include_slash = open_sequence.map(|o| o.clear || o.capture).unwrap_or(true);
+            slash_command_text(&text, include_slash, settings.slash_command_digits)
         }
         PasteMode::Normal => {
             let text = apply_capitalization(&text, settings.capitalization);
@@ -1219,7 +1214,9 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
     let review = settings.review_before_sending && open_sequence.is_some();
     let send_submit = !review && should_send_auto_submit(settings.auto_submit, paste_method);
     let after_paste = if review {
-        AfterPaste::Park
+        // The addon grabs a paste the moment it lands, so nothing more is
+        // pressed; typed text (Direct) is ended with Enter below.
+        AfterPaste::Nothing
     } else if send_submit {
         AfterPaste::Submit(settings.auto_submit_key)
     } else {
@@ -1306,8 +1303,9 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
         }
     }
 
-    // Direct typing and external scripts park after the text is in.
-    if review && !submitted {
+    // Typed text (Direct, external scripts) doesn't look like a paste to the
+    // addon, so end it with Enter.
+    if review && paste_method_types_text(paste_method) {
         if let Err(error) = with_enigo(&app_handle, |enigo| AfterPaste::Park.send(enigo)) {
             log::warn!("Paste succeeded, but parking the message for review failed: {error}");
         }
