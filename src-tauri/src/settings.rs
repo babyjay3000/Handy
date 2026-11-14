@@ -514,6 +514,8 @@ pub struct AppSettings {
     pub capitalization: CapitalizationMode,
     #[serde(default = "default_slash_command_digits")]
     pub slash_command_digits: bool,
+    #[serde(default)]
+    pub review_before_sending: bool,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
     #[serde(default = "default_post_process_provider_id")]
@@ -1030,6 +1032,22 @@ pub fn get_default_settings() -> AppSettings {
     #[cfg(not(target_os = "macos"))]
     let default_slash_command_shortcut = "ctrl+alt+space";
 
+    #[cfg(target_os = "macos")]
+    let default_submit_review_shortcut = "option+control+s";
+    #[cfg(not(target_os = "macos"))]
+    let default_submit_review_shortcut = "ctrl+alt+s";
+
+    bindings.insert(
+        "submit_reviewed_message".to_string(),
+        ShortcutBinding {
+            id: "submit_reviewed_message".to_string(),
+            name: "Submit Reviewed Message".to_string(),
+            description: "Sends the message waiting in the Chat Reviewer preview.".to_string(),
+            default_binding: default_submit_review_shortcut.to_string(),
+            current_binding: default_submit_review_shortcut.to_string(),
+        },
+    );
+
     bindings.insert(
         "transcribe_slash_command".to_string(),
         ShortcutBinding {
@@ -1093,6 +1111,7 @@ pub fn get_default_settings() -> AppSettings {
         open_input_field_clear: false,
         capitalization: CapitalizationMode::default(),
         slash_command_digits: default_slash_command_digits(),
+        review_before_sending: false,
         post_process_enabled: default_post_process_enabled(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
@@ -1486,6 +1505,16 @@ pub fn get_history_limit(app: &AppHandle) -> usize {
 pub fn get_recording_retention_period(app: &AppHandle) -> RecordingRetentionPeriod {
     let settings = get_settings(app);
     settings.recording_retention_period
+}
+
+/// Game-chat shortcuts that only exist while their feature is switched on.
+/// Returns false for those that should currently stay unregistered.
+pub fn is_game_binding_active(id: &str, settings: &AppSettings) -> bool {
+    match id {
+        "transcribe_slash_command" => settings.open_input_field,
+        "submit_reviewed_message" => settings.open_input_field && settings.review_before_sending,
+        _ => true,
+    }
 }
 
 #[cfg(test)]

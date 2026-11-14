@@ -309,7 +309,7 @@ pub fn resume_all_shortcuts(app: &AppHandle) {
         if id == "transcribe_with_post_process" && !settings.post_process_enabled {
             continue;
         }
-        if id == "transcribe_slash_command" && !settings.open_input_field {
+        if !crate::settings::is_game_binding_active(&id, &settings) {
             continue;
         }
         if let Err(e) = register_shortcut(app, binding.clone()) {
@@ -504,7 +504,7 @@ fn register_all_shortcuts_for_implementation(
         if id == "transcribe_with_post_process" && !current_settings.post_process_enabled {
             continue;
         }
-        if id == "transcribe_slash_command" && !current_settings.open_input_field {
+        if !crate::settings::is_game_binding_active(&id, &current_settings) {
             continue;
         }
 
@@ -1092,21 +1092,47 @@ pub fn change_auto_submit_key_setting(app: AppHandle, key: String) -> Result<(),
 #[tauri::command]
 #[specta::specta]
 pub fn change_open_input_field_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
-    let mut settings = settings::get_settings(&app);
+    let before = settings::get_settings(&app);
+    let mut settings = before.clone();
     settings.open_input_field = enabled;
     settings::write_settings(&app, settings.clone());
+    sync_game_bindings(&app, &before, &settings);
+    Ok(())
+}
 
-    // The slash-command shortcut only exists while Open Input Field is on.
-    if let Some(binding) = settings.bindings.get("transcribe_slash_command").cloned() {
-        if enabled {
-            let _ = register_shortcut(&app, binding);
-        } else {
-            let _ = unregister_shortcut(&app, binding);
+#[tauri::command]
+#[specta::specta]
+pub fn change_review_before_sending_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let before = settings::get_settings(&app);
+    let mut settings = before.clone();
+    settings.review_before_sending = enabled;
+    settings::write_settings(&app, settings.clone());
+    sync_game_bindings(&app, &before, &settings);
+    Ok(())
+}
+
+/// Registers or unregisters the game-chat shortcuts (slash command, submit
+/// reviewed message) whose feature was just switched on or off.
+fn sync_game_bindings(
+    app: &AppHandle,
+    before: &settings::AppSettings,
+    after: &settings::AppSettings,
+) {
+    for id in ["transcribe_slash_command", "submit_reviewed_message"] {
+        let was_active = settings::is_game_binding_active(id, before);
+        let is_active = settings::is_game_binding_active(id, after);
+        if was_active == is_active {
+            continue;
+        }
+        if let Some(binding) = after.bindings.get(id).cloned() {
+            let _ = if is_active {
+                register_shortcut(app, binding)
+            } else {
+                unregister_shortcut(app, binding)
+            };
         }
     }
-
-    crate::secure_input::reconcile_fallback(&app);
-    Ok(())
+    crate::secure_input::reconcile_fallback(app);
 }
 
 #[tauri::command]

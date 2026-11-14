@@ -437,7 +437,7 @@ pub fn init_shortcuts(app: &AppHandle) -> Result<(), String> {
         if id == "transcribe_with_post_process" && !user_settings.post_process_enabled {
             continue;
         }
-        if id == "transcribe_slash_command" && !user_settings.open_input_field {
+        if !crate::settings::is_game_binding_active(&id, &user_settings) {
             continue;
         }
 

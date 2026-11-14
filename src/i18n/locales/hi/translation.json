@@ -349,6 +349,10 @@
           "transcribe_slash_command": {
             "name": "Slash Command Shortcut",
             "description": "Opens chat with / and inserts what you say as a lowercase command without punctuation, e.g. say \"dance\" to send /dance."
+          },
+          "submit_reviewed_message": {
+            "name": "Submit Reviewed Message",
+            "description": "Sends the message waiting in the Chat Reviewer preview."
           }
         },
         "errors": {
@@ -571,6 +575,8 @@
         "delayDescription": "How long to wait (in milliseconds) after pressing the key before inserting text. Increase if the start of your message gets cut off or lands outside the chat box.",
         "digitsTitle": "Slash Command Numbers as Digits",
         "digitsDescription": "When a slash command starts with a spoken number, type it as digits, so saying \"two LFG tank\" sends /2 lfg tank. Also catches common mishearings like \"to\" or \"for\".",
+        "reviewTitle": "Review Before Sending",
+        "reviewDescription": "For World of Warcraft with the Chat Reviewer addon. Instead of sending, your message is parked in a preview so you can keep playing. Send it with the Submit shortcut, or record again to replace it (a quick tap cancels it). Overrides Auto Submit.",
         "clearTitle": "Clear Field Before Pasting",
         "clearDescription": "Press Shift+Home after the field opens to select anything already typed, so your message replaces any stray keys. Shift+Home is used instead of Ctrl+A so held movement keys like A aren't interrupted.",
         "keys": {

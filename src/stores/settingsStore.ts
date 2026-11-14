@@ -169,6 +169,8 @@ const settingUpdaters: {
     commands.changeOpenInputFieldDelayMsSetting(value as number),
   open_input_field_clear: (value) =>
     commands.changeOpenInputFieldClearSetting(value as boolean),
+  review_before_sending: (value) =>
+    commands.changeReviewBeforeSendingSetting(value as boolean),
   slash_command_digits: (value) =>
     commands.changeSlashCommandDigitsSetting(value as boolean),
   capitalization: (value) =>

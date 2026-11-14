@@ -447,6 +447,10 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
+        // Starting a new recording replaces a message waiting for review, so
+        // a quick tap of the shortcut cancels it.
+        crate::clipboard::review_discard_if_pending(app);
+
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
@@ -943,6 +947,17 @@ impl ShortcutAction for CancelAction {
     }
 }
 
+// Submit Reviewed Message Action
+struct SubmitReviewAction;
+
+impl ShortcutAction for SubmitReviewAction {
+    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+        crate::clipboard::review_submit(app);
+    }
+
+    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+}
+
 // Test Action
 struct TestAction;
 
@@ -993,6 +1008,10 @@ pub static ACTION_MAP: Lazy<HashMap<String, Arc<dyn ShortcutAction>>> = Lazy::ne
     map.insert(
         "cancel".to_string(),
         Arc::new(CancelAction) as Arc<dyn ShortcutAction>,
+    );
+    map.insert(
+        "submit_reviewed_message".to_string(),
+        Arc::new(SubmitReviewAction) as Arc<dyn ShortcutAction>,
     );
     map.insert(
         "test".to_string(),

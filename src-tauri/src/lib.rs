@@ -692,6 +692,7 @@ pub fn run(cli_args: CliArgs) {
             shortcut::change_open_input_field_clear_setting,
             shortcut::change_capitalization_setting,
             shortcut::change_slash_command_digits_setting,
+            shortcut::change_review_before_sending_setting,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_experimental_enabled_setting,
             shortcut::change_post_process_base_url_setting,

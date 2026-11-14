@@ -8,6 +8,7 @@ use crate::settings::{
 use enigo::{Direction, Enigo, Key, Keyboard};
 use log::info;
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "linux")]
 use std::sync::OnceLock;
 use std::sync::{mpsc, Mutex, PoisonError};
@@ -81,7 +82,7 @@ fn paste_via_clipboard(
     paste_delay_ms: u64,
     paste_delay_after_ms: u64,
     open_sequence: Option<OpenSequence>,
-    submit_key: Option<AutoSubmitKey>,
+    after_paste: AfterPaste,
 ) -> Result<bool, String> {
     let clipboard = app_handle.clipboard();
     let saved_text = clipboard.read_text().ok().filter(|t| !t.is_empty());
@@ -114,15 +115,7 @@ fn paste_via_clipboard(
                     PasteMethod::ShiftInsert => input::send_paste_shift_insert(enigo, 100)?,
                     _ => return Err("Invalid paste method for clipboard paste".into()),
                 }
-                match submit_key {
-                    Some(key) => {
-                        if let Err(error) = send_return_key(enigo, key) {
-                            log::warn!("Paste succeeded, but auto-submit failed: {error}");
-                        }
-                        Ok(true)
-                    }
-                    None => Ok(false),
-                }
+                after_paste.send(enigo)
             });
         }
 
@@ -856,6 +849,111 @@ fn open_input_field_key(key: OpenInputFieldKey) -> Key {
     }
 }
 
+/// What to press right after the text lands in a game's chat box.
+#[derive(Debug, Clone, Copy)]
+enum AfterPaste {
+    Nothing,
+    /// Send the message (Auto Submit).
+    Submit(AutoSubmitKey),
+    /// Park the message for review: Shift+Escape, which the Chat Reviewer WoW
+    /// addon turns into "close chat but keep the message in a preview".
+    Park,
+}
+
+impl AfterPaste {
+    /// Returns whether a key was sent (so the caller doesn't send it again).
+    fn send(self, enigo: &mut Enigo) -> Result<bool, String> {
+        match self {
+            AfterPaste::Nothing => Ok(false),
+            AfterPaste::Submit(key) => {
+                if let Err(error) = send_return_key(enigo, key) {
+                    log::warn!("Paste succeeded, but auto-submit failed: {error}");
+                }
+                Ok(true)
+            }
+            AfterPaste::Park => {
+                send_park_message(enigo)?;
+                REVIEW_PENDING.store(true, Ordering::SeqCst);
+                Ok(true)
+            }
+        }
+    }
+}
+
+/// Whether a message is parked in the game waiting for review.
+static REVIEW_PENDING: AtomicBool = AtomicBool::new(false);
+
+/// Presses and releases `key` with a short hold, so games that poll keyboard
+/// state each frame still see it.
+fn tap_key(enigo: &mut Enigo, key: Key) -> Result<(), String> {
+    enigo
+        .key(key, Direction::Press)
+        .map_err(|e| format!("Failed to press {:?}: {}", key, e))?;
+    std::thread::sleep(Duration::from_millis(30));
+    enigo
+        .key(key, Direction::Release)
+        .map_err(|e| format!("Failed to release {:?}: {}", key, e))
+}
+
+/// Shift+Escape: closes chat while the Chat Reviewer addon keeps the message.
+fn send_park_message(enigo: &mut Enigo) -> Result<(), String> {
+    enigo
+        .key(Key::Shift, Direction::Press)
+        .map_err(|e| format!("Failed to press Shift: {}", e))?;
+    let result = tap_key(enigo, Key::Escape);
+    enigo
+        .key(Key::Shift, Direction::Release)
+        .map_err(|e| format!("Failed to release Shift: {}", e))?;
+    result
+}
+
+/// Opens chat with Enter (which makes the Chat Reviewer addon put the parked
+/// message back in the box) and then presses `final_key`: Enter sends it, Escape
+/// throws it away. Runs on its own thread so it never blocks a shortcut.
+fn review_reopen_and_press(app_handle: &AppHandle, final_key: Key, what: &'static str) {
+    let settings = get_settings(app_handle);
+    if !(settings.open_input_field && settings.review_before_sending) {
+        return;
+    }
+    let delay_ms = settings.open_input_field_delay_ms.min(300);
+    let app = app_handle.clone();
+    std::thread::spawn(move || {
+        let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
+        let result = with_enigo(&app, move |enigo| {
+            // The shortcut that triggered this may still be held. Release its
+            // modifiers so the game sees a plain Enter, not e.g. Ctrl+Alt+Enter.
+            for modifier in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
+                let _ = enigo.key(modifier, Direction::Release);
+            }
+            // Always Enter: the addon only restores a message when chat is
+            // opened with Enter (not "/").
+            tap_key(enigo, Key::Return)?;
+            if delay_ms > 0 {
+                std::thread::sleep(Duration::from_millis(delay_ms));
+            }
+            tap_key(enigo, final_key)
+        });
+        match result {
+            Ok(()) => info!("Review: {what} parked message"),
+            Err(error) => log::warn!("Review: failed to {what} parked message: {error}"),
+        }
+    });
+}
+
+/// Sends the parked message (the Submit shortcut).
+pub fn review_submit(app_handle: &AppHandle) {
+    REVIEW_PENDING.store(false, Ordering::SeqCst);
+    review_reopen_and_press(app_handle, Key::Return, "send");
+}
+
+/// Throws away a parked message, if there is one. Called when a new recording
+/// starts, so a quick tap of the record shortcut cancels the whole thing.
+pub fn review_discard_if_pending(app_handle: &AppHandle) {
+    if REVIEW_PENDING.swap(false, Ordering::SeqCst) {
+        review_reopen_and_press(app_handle, Key::Escape, "discard");
+    }
+}
+
 /// The keys sent right before the text: open the input field, wait for it to
 /// appear, then optionally select everything already in it so the paste
 /// replaces any stray characters.
@@ -887,15 +985,7 @@ impl OpenSequence {
     }
 
     fn send(&self, enigo: &mut Enigo) -> Result<(), String> {
-        let key = open_input_field_key(self.key);
-        enigo
-            .key(key, Direction::Press)
-            .map_err(|e| format!("Failed to press open input field key: {}", e))?;
-        // Brief hold so games that poll keyboard state each frame still see it.
-        std::thread::sleep(Duration::from_millis(30));
-        enigo
-            .key(key, Direction::Release)
-            .map_err(|e| format!("Failed to release open input field key: {}", e))?;
+        tap_key(enigo, open_input_field_key(self.key))?;
 
         if self.delay_ms > 0 {
             std::thread::sleep(Duration::from_millis(self.delay_ms));
@@ -1119,7 +1209,16 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
         paste_method, paste_delay_ms, paste_delay_after_ms, open_sequence
     );
 
-    let send_submit = should_send_auto_submit(settings.auto_submit, paste_method);
+    // Review mode parks the message (Chat Reviewer addon) instead of sending.
+    let review = settings.review_before_sending && open_sequence.is_some();
+    let send_submit = !review && should_send_auto_submit(settings.auto_submit, paste_method);
+    let after_paste = if review {
+        AfterPaste::Park
+    } else if send_submit {
+        AfterPaste::Submit(settings.auto_submit_key)
+    } else {
+        AfterPaste::Nothing
+    };
     let mut submitted = false;
 
     // Perform the paste operation
@@ -1175,7 +1274,6 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
                     }
                 }
             }
-            let submit_key = send_submit.then_some(settings.auto_submit_key);
             submitted = paste_via_clipboard(
                 &text,
                 &app_handle,
@@ -1183,7 +1281,7 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
                 paste_delay_ms,
                 paste_delay_after_ms,
                 open_sequence,
-                submit_key,
+                after_paste,
             )?;
         }
         PasteMethod::ExternalScript => {
@@ -1199,6 +1297,13 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
                 }
             }
             paste_via_external_script(&text, script_path)?;
+        }
+    }
+
+    // Direct typing and external scripts park after the text is in.
+    if review && !submitted {
+        if let Err(error) = with_enigo(&app_handle, |enigo| AfterPaste::Park.send(enigo)) {
+            log::warn!("Paste succeeded, but parking the message for review failed: {error}");
         }
     }
 

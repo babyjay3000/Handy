@@ -21,6 +21,7 @@ export const OpenInputField: React.FC<OpenInputFieldProps> = React.memo(
 
     const enabled = getSetting("open_input_field") ?? false;
     const delayMs = getSetting("open_input_field_delay_ms") ?? 0;
+    const reviewEnabled = getSetting("review_before_sending") ?? false;
     const selectedKey = (getSetting("open_input_field_key") ||
       "enter") as OpenInputFieldKey;
 
@@ -112,6 +113,26 @@ export const OpenInputField: React.FC<OpenInputFieldProps> = React.memo(
               descriptionMode={descriptionMode}
               grouped={grouped}
             />
+            <ToggleSwitch
+              checked={reviewEnabled}
+              onChange={(value) =>
+                updateSetting("review_before_sending", value)
+              }
+              isUpdating={isUpdating("review_before_sending")}
+              label={t("settings.advanced.openInputField.reviewTitle")}
+              description={t(
+                "settings.advanced.openInputField.reviewDescription",
+              )}
+              descriptionMode={descriptionMode}
+              grouped={grouped}
+            />
+            {reviewEnabled && (
+              <ShortcutInput
+                shortcutId="submit_reviewed_message"
+                descriptionMode={descriptionMode}
+                grouped={grouped}
+              />
+            )}
           </>
         )}
       </>

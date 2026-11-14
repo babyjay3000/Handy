@@ -483,7 +483,7 @@ mod imp {
                 if id == "transcribe_with_post_process" && !settings.post_process_enabled {
                     continue;
                 }
-                if id == "transcribe_slash_command" && !settings.open_input_field {
+                if !crate::settings::is_game_binding_active(&id, &settings) {
                     continue;
                 }
 
