@@ -576,7 +576,7 @@
         "digitsTitle": "Slash Command Numbers as Digits",
         "digitsDescription": "When a slash command starts with a spoken number, type it as digits, so saying \"two LFG tank\" sends /2 lfg tank. Also catches common mishearings like \"to\" or \"for\".",
         "reviewTitle": "Review Before Sending",
-        "reviewDescription": "For World of Warcraft with the Chat Reviewer addon. Instead of sending, your message is parked in a preview so you can keep playing. Send it with the Submit shortcut, or record again to replace it (a quick tap cancels it). Overrides Auto Submit.",
+        "reviewDescription": "For World of Warcraft with the Chat Reviewer addon. Instead of sending, your message is parked in a preview so you can keep playing. Send it with the Submit shortcut, or record again to replace it (a quick tap cancels it). Handy presses Ctrl+Shift+F11 to send and Ctrl+Shift+F12 to discard, which the addon binds for you. Overrides Auto Submit.",
         "clearTitle": "Clear Field Before Pasting",
         "clearDescription": "Press Shift+Home after the field opens to select anything already typed, so your message replaces any stray keys. Shift+Home is used instead of Ctrl+A so held movement keys like A aren't interrupted.",
         "keys": {

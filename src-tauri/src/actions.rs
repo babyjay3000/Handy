@@ -449,7 +449,7 @@ impl ShortcutAction for TranscribeAction {
 
         // Starting a new recording replaces a message waiting for review, so
         // a quick tap of the shortcut cancels it.
-        crate::clipboard::review_discard_if_pending(app);
+        crate::clipboard::review_discard(app);
 
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();

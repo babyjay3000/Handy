@@ -8,7 +8,6 @@ use crate::settings::{
 use enigo::{Direction, Enigo, Key, Keyboard};
 use log::info;
 use std::process::Command;
-use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "linux")]
 use std::sync::OnceLock;
 use std::sync::{mpsc, Mutex, PoisonError};
@@ -873,15 +872,11 @@ impl AfterPaste {
             }
             AfterPaste::Park => {
                 send_park_message(enigo)?;
-                REVIEW_PENDING.store(true, Ordering::SeqCst);
                 Ok(true)
             }
         }
     }
 }
-
-/// Whether a message is parked in the game waiting for review.
-static REVIEW_PENDING: AtomicBool = AtomicBool::new(false);
 
 /// Presses and releases `key` with a short hold, so games that poll keyboard
 /// state each frame still see it.
@@ -907,31 +902,32 @@ fn send_park_message(enigo: &mut Enigo) -> Result<(), String> {
     result
 }
 
-/// Opens chat with Enter (which makes the Chat Reviewer addon put the parked
-/// message back in the box) and then presses `final_key`: Enter sends it, Escape
-/// throws it away. Runs on its own thread so it never blocks a shortcut.
-fn review_reopen_and_press(app_handle: &AppHandle, final_key: Key, what: &'static str) {
+/// Presses Ctrl+Shift+`key`, which the Chat Reviewer addon binds to "send
+/// parked message" (F11) or "discard parked message" (F12). The addon does
+/// the work itself, so no chat box is opened. Runs on its own thread so it
+/// never blocks a shortcut.
+fn press_review_binding(app_handle: &AppHandle, key: Key, what: &'static str) {
     let settings = get_settings(app_handle);
     if !(settings.open_input_field && settings.review_before_sending) {
         return;
     }
-    let delay_ms = settings.open_input_field_delay_ms.min(300);
     let app = app_handle.clone();
     std::thread::spawn(move || {
         let _paste = PASTE_LOCK.lock().unwrap_or_else(PoisonError::into_inner);
         let result = with_enigo(&app, move |enigo| {
             // The shortcut that triggered this may still be held. Release its
-            // modifiers so the game sees a plain Enter, not e.g. Ctrl+Alt+Enter.
+            // modifiers so the game sees exactly Ctrl+Shift+key.
             for modifier in [Key::Control, Key::Alt, Key::Shift, Key::Meta] {
                 let _ = enigo.key(modifier, Direction::Release);
             }
-            // Always Enter: the addon only restores a message when chat is
-            // opened with Enter (not "/").
-            tap_key(enigo, Key::Return)?;
-            if delay_ms > 0 {
-                std::thread::sleep(Duration::from_millis(delay_ms));
-            }
-            tap_key(enigo, final_key)
+            enigo
+                .key(Key::Control, Direction::Press)
+                .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
+            let _ = enigo.key(Key::Shift, Direction::Press);
+            let result = tap_key(enigo, key);
+            let _ = enigo.key(Key::Shift, Direction::Release);
+            let _ = enigo.key(Key::Control, Direction::Release);
+            result
         });
         match result {
             Ok(()) => info!("Review: {what} parked message"),
@@ -942,16 +938,14 @@ fn review_reopen_and_press(app_handle: &AppHandle, final_key: Key, what: &'stati
 
 /// Sends the parked message (the Submit shortcut).
 pub fn review_submit(app_handle: &AppHandle) {
-    REVIEW_PENDING.store(false, Ordering::SeqCst);
-    review_reopen_and_press(app_handle, Key::Return, "send");
+    press_review_binding(app_handle, Key::F11, "send");
 }
 
 /// Throws away a parked message, if there is one. Called when a new recording
 /// starts, so a quick tap of the record shortcut cancels the whole thing.
-pub fn review_discard_if_pending(app_handle: &AppHandle) {
-    if REVIEW_PENDING.swap(false, Ordering::SeqCst) {
-        review_reopen_and_press(app_handle, Key::Escape, "discard");
-    }
+/// Harmless when nothing is parked, so it doesn't need to know.
+pub fn review_discard(app_handle: &AppHandle) {
+    press_review_binding(app_handle, Key::F12, "discard");
 }
 
 /// The keys sent right before the text: open the input field, wait for it to
