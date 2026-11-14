@@ -447,10 +447,6 @@ impl ShortcutAction for TranscribeAction {
         let start_time = Instant::now();
         debug!("TranscribeAction::start called for binding: {}", binding_id);
 
-        // Starting a new recording replaces a message waiting for review, so
-        // a quick tap of the shortcut cancels it.
-        crate::clipboard::review_discard(app);
-
         // Load model in the background
         let tm = app.state::<Arc<TranscriptionManager>>();
         let rm = app.state::<Arc<AudioRecordingManager>>();
@@ -695,6 +691,10 @@ impl ShortcutAction for TranscribeAction {
 
                 if samples.is_empty() {
                     debug!("Recording produced no audio samples; skipping persistence");
+                    // A quick tap with nothing said cancels a message waiting
+                    // for review (Chat Reviewer). Done here, after the key is
+                    // released, never while the shortcut is held.
+                    crate::clipboard::review_discard(&ah);
                     // Tear down any streaming worker so its channel doesn't leak
                     // and block the next start_stream.
                     tm.cancel_stream();
@@ -802,6 +802,8 @@ impl ShortcutAction for TranscribeAction {
                             }
 
                             if processed.final_text.is_empty() {
+                                // Nothing said: cancel a message waiting for review.
+                                crate::clipboard::review_discard(&ah);
                                 utils::hide_recording_overlay(&ah);
                                 set_tray_state(&ah, TrayIconState::Idle);
                                 emit_transcription_complete(
@@ -922,6 +924,8 @@ impl ShortcutAction for TranscribeAction {
                 utils::hide_recording_overlay(&ah);
                 set_tray_state(&ah, TrayIconState::Idle);
                 if !rm.was_cancelled_since(cancel_generation) {
+                    // A tap too short to record: cancel a message waiting for review.
+                    crate::clipboard::review_discard(&ah);
                     emit_transcription_complete(&ah, TranscriptionOutcome::Empty, 0, stop_time);
                 }
             }
@@ -951,11 +955,13 @@ impl ShortcutAction for CancelAction {
 struct SubmitReviewAction;
 
 impl ShortcutAction for SubmitReviewAction {
-    fn start(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
+    fn start(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
+
+    // Sends on release, so no keys are pressed for the game while the
+    // shortcut is still held (which could confuse shortcut detection).
+    fn stop(&self, app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {
         crate::clipboard::review_submit(app);
     }
-
-    fn stop(&self, _app: &AppHandle, _binding_id: &str, _shortcut_str: &str) {}
 }
 
 // Test Action

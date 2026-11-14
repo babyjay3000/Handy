@@ -941,9 +941,10 @@ pub fn review_submit(app_handle: &AppHandle) {
     press_review_binding(app_handle, Key::F11, "send");
 }
 
-/// Throws away a parked message, if there is one. Called when a new recording
-/// starts, so a quick tap of the record shortcut cancels the whole thing.
-/// Harmless when nothing is parked, so it doesn't need to know.
+/// Throws away a parked message, if there is one. Called when a recording
+/// comes back empty (a quick tap), after the shortcut is released. A real new
+/// message doesn't need it: pasting replaces the parked one. Harmless when
+/// nothing is parked, so it doesn't need to know.
 pub fn review_discard(app_handle: &AppHandle) {
     press_review_binding(app_handle, Key::F12, "discard");
 }
