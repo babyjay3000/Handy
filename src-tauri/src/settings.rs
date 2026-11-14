@@ -593,7 +593,7 @@ pub struct AppSettings {
     /// in `apply_settings_migrations`.
     #[serde(default)]
     pub chinese_script: ChineseScript,
-    #[serde(default)]
+    #[serde(default = "default_transcribe_accelerator")]
     pub transcribe_accelerator: TranscribeAcceleratorSetting,
     /// Stable transcribe.cpp device selector. This is derived from the backend's
     /// `device_id` when available (or its name for backends such as Metal),
@@ -643,7 +643,9 @@ fn default_hold_threshold_ms() -> u64 {
 }
 
 fn default_always_on_microphone() -> bool {
-    false
+    // Handy Game Chat: on by default. Opening the mic on every key press cut
+    // off the first word; keeping it open makes capture start instantly.
+    true
 }
 
 fn default_translate_to_english() -> bool {
@@ -659,7 +661,15 @@ fn default_autostart_enabled() -> bool {
 }
 
 fn default_update_checks_enabled() -> bool {
-    true
+    // Handy Game Chat: off by default. The updater points at official Handy,
+    // which would replace this build (and its game-chat features).
+    false
+}
+
+fn default_transcribe_accelerator() -> TranscribeAcceleratorSetting {
+    // Handy Game Chat: CPU by default. With a game using the graphics card,
+    // GPU transcription waits its turn and is much slower.
+    TranscribeAcceleratorSetting::Cpu
 }
 
 fn default_show_whats_new_on_update() -> bool {
@@ -1111,7 +1121,7 @@ pub fn get_default_settings() -> AppSettings {
         whats_new_last_seen_version: default_whats_new_last_seen_version(),
         selected_model: "".to_string(),
         onboarding_completed: false,
-        always_on_microphone: false,
+        always_on_microphone: default_always_on_microphone(),
         spoken_languages: Vec::new(),
         selected_microphone: None,
         selected_channel: None,
@@ -1164,7 +1174,7 @@ pub fn get_default_settings() -> AppSettings {
         filler_word_removal_enabled: default_filler_word_removal_enabled(),
         custom_filler_words: None,
         chinese_script: default_chinese_script(),
-        transcribe_accelerator: TranscribeAcceleratorSetting::default(),
+        transcribe_accelerator: default_transcribe_accelerator(),
         transcribe_gpu_device: default_transcribe_gpu_device(),
         extra_recording_buffer_ms: 0,
         vad_enabled: default_vad_enabled(),
