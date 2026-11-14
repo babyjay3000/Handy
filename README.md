@@ -4,7 +4,7 @@
 
 Handy Game Chat is a fork of [Handy](https://github.com/cjpais/Handy), a free, open-source speech-to-text app that runs **entirely on your own computer**. No audio is sent to the cloud. This version adds options built for in-game chat, so you can keep running, jumping, casting and PvPing while you talk.
 
-### ⬇️ [Download the latest release](https://github.com/babyjay3000/Handy/releases/latest)
+### ⬇️ [Download the latest release](https://github.com/babyjay3000/Handy/releases/latest) · 🧩 [Chat Reviewer addon on CurseForge](https://www.curseforge.com/wow/addons/chat-reviewer)
 
 > Windows only for now. The installer isn't code-signed, so Windows SmartScreen will warn you. Click **More info → Run anyway**.
 
@@ -16,18 +16,28 @@ I recently began using an **Azeron Cyborg 2** so I'd have over 100 keybinds with
 
 [This video](https://youtu.be/8Iag9ND7biE) introduced me to Handy. It worked incredibly well in game, but it wasn't quite as good as it could be. I wanted to **hold a button while doing whatever I'm doing, and the moment I release it, have my message go straight into WoW chat.** So I added that.
 
+## Two ways to chat
+
+**1. Review before sending (recommended).** Your message appears in a small preview in-game, using the free **[Chat Reviewer](https://www.curseforge.com/wow/addons/chat-reviewer)** addon, while you keep playing. Press your **Submit** key to send it, record again to replace it, or just tap record to cancel. WoW's chat box is never opened, so stray keys can't sneak into your message.
+
+**2. Send instantly.** Hold, talk, release, and it's sent. No addon needed.
+
 ## What it adds
 
-All new options are in **Settings → Advanced → Output**.
+All new options are in **Settings → Advanced**.
 
 | Option | What it does |
 |---|---|
-| **Open Input Field** | Presses the key that opens chat in WoW (e.g. `Enter`) right before your message is typed. |
-| **Input Field Delay** | Defaults to **0 ms**. Add a little delay if messages get submitted too quickly. |
-| **Clear Field Before Pasting** | A must-have. Stray keys, like your movement keys, can slip into the message you're sending. This uses **Shift+Home** to select them so your message replaces them. (Not Ctrl+A, because that would interfere with most players' movement.) Since adding this, I haven't gotten a single unwanted keypress in my testing. |
+| **Open Input Field** | Turns on game-chat mode: Handy opens chat (e.g. with `Enter`) right before your message is typed. |
+| **Review Before Sending** | Sends your message to the Chat Reviewer preview instead of straight to chat. Comes with a **Submit Reviewed Message** shortcut. |
+| **Input Field Delay** | Defaults to **0 ms**. Add a little delay if a game's chat box opens slowly. |
+| **Clear Field Before Pasting** | For send-instantly mode. Stray keys, like your movement keys, can slip into the message you're sending. This uses **Shift+Home** to select them so your message replaces them. (Not Ctrl+A, because that would interfere with most players' movement.) Review mode doesn't need it. |
+| **Shortcuts Ignore Ctrl/Alt/Shift** | Your record, slash command and submit shortcuts still work while you're holding a modifier, and **your held modifiers stay held** in WoW, so your next modified ability fires without re-pressing. |
 | **Slash Command Shortcut** | A second keybind that opens chat with `/`. Hold it and say "dance" or "train". Say "yell hello world" to get `/yell hello world`. Channel commands like yell, say, party and raid are handled cleanly, and spoken numbers become channel numbers ("two LFG tank" → `/2 lfg tank`). |
 | **Slash Command Numbers as Digits** | Turns a spoken number at the start of a slash command into digits, for `/1`, `/2` and so on. On by default. |
 | **Auto-Capitalization** | Turn off the automatic capitals if you like. Role-players may want to keep them; I think chat looks more natural and casual without them. |
+| **Overlay Theme → Classic** | Swaps the recording overlay for a lo-fi pixel-art speaker whose sound waves follow your voice. |
+| **Overlay Location** | Click **Move**, drag the overlay anywhere on screen, then **Done**. |
 
 You don't even need the second shortcut: with the main keybind, just say **"slash yell hello world."**
 
@@ -35,15 +45,19 @@ You don't even need the second shortcut: with the main keybind, just say **"slas
 
 1. Download and run the installer from the [Releases page](https://github.com/babyjay3000/Handy/releases/latest).
 2. Follow Handy's first-time setup, which downloads a speech model.
-3. In **Settings → Advanced**:
-   - Turn on **Open Input Field** (key: **Enter**) and **Clear Field Before Pasting**.
-   - Set **Auto Submit** to **Enter**.
-   - Turn **off** "Check for updates". The updater points to the official Handy and would replace this version.
-4. Set your **Transcribe** shortcut (and the **Slash Command** shortcut, if you want it) to keys or buttons you can hold comfortably while playing.
+3. Install **[Chat Reviewer](https://www.curseforge.com/wow/addons/chat-reviewer)** from CurseForge (for review mode).
+4. In **Settings → Advanced**:
+   - Turn on **Open Input Field** and **Review Before Sending**, and set your **Submit Reviewed Message** shortcut.
+   - Or, to send instantly instead: turn on **Open Input Field** (key: **Enter**) and **Clear Field Before Pasting**, and set **Auto Submit** to **Enter**.
+5. Set your **Transcribe** shortcut (and the **Slash Command** shortcut, if you want it) to keys or buttons you can hold comfortably while playing.
+
+**Already set up for you:** new installs start with the microphone kept ready (so your first word isn't cut off), transcription on the CPU (much faster while WoW uses your graphics card), and update checks off (Handy's updater points to the official version and would replace this one).
+
+**Optional:** Settings → Advanced → **Unload Model → Never** keeps the first message after a break just as fast as the rest.
 
 **Recommended settings:**
 
-<img width="715" height="626" alt="Screenshot 2026-11-01 133614" src="https://github.com/user-attachments/assets/9c659bb7-8e1e-4dea-8eab-9b50145402e8" />
+<img width="718" height="1170" alt="Screenshot 2026-11-14 082316" src="https://github.com/user-attachments/assets/f8d0f956-2006-4ef9-88fd-c681b8480083" />
 
 It runs in the background, can launch automatically at startup, and has an optional floating widget so you can watch your voice being recorded, or hide it so it becomes a seamless part of your gameplay. It takes about 1–2 seconds to transcribe what you say and put it in game.
 
