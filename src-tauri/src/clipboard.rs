@@ -1247,6 +1247,19 @@ pub fn paste_with_mode(text: String, app_handle: AppHandle, mode: PasteMode) -> 
     // (e.g. a game's chat box) right before the text is inserted.
     let open_sequence = OpenSequence::from_settings(&settings, mode);
 
+    // Chat-style cleanup (both off by default): shorten common phrases
+    // ("to be honest" -> "tbh", "looking for group" -> "LFG") and drop commas.
+    let text = if settings.chat_abbreviations {
+        crate::chat_text::abbreviate(&text)
+    } else {
+        text
+    };
+    let text = if settings.remove_commas {
+        crate::chat_text::remove_commas(&text)
+    } else {
+        text
+    };
+
     let text = match mode {
         PasteMode::SlashCommand => {
             // The `/` must be part of the pasted text when nothing typed it

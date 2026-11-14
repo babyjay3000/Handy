@@ -609,6 +609,12 @@
           "lowercase": "All lowercase"
         }
       },
+      "chatText": {
+        "removeCommasTitle": "Remove Commas",
+        "removeCommasDescription": "Leave out the commas the speech model adds, for a more casual chat style. Commas inside numbers (1,000) are kept.",
+        "abbreviationsTitle": "Chat Abbreviations",
+        "abbreviationsDescription": "Shorten common phrases the way people type in chat, including the words around them: \"I'm not gonna lie\" → ngl, \"to be honest\" → tbh, \"be right back\" → brb, \"looking for group\" → LFG, \"we're looking for a healer\" → LF healer, \"want to sell\" → WTS, \"incoming\" → inc, \"out of mana\" → oom."
+      },
       "translateToEnglish": {
         "label": "Traduzir para Inglês",
         "description": "Traduzir automaticamente fala de outros idiomas para inglês durante a transcrição."

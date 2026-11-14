@@ -172,6 +172,10 @@ const settingUpdaters: {
   game_shortcuts_ignore_modifiers: (value) =>
     commands.changeGameShortcutsIgnoreModifiersSetting(value as boolean),
   overlay_theme: (value) => commands.changeOverlayThemeSetting(value as string),
+  remove_commas: (value) =>
+    commands.changeRemoveCommasSetting(value as boolean),
+  chat_abbreviations: (value) =>
+    commands.changeChatAbbreviationsSetting(value as boolean),
   review_before_sending: (value) =>
     commands.changeReviewBeforeSendingSetting(value as boolean),
   slash_command_digits: (value) =>

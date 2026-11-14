@@ -5,6 +5,7 @@ mod audio_feedback;
 pub mod audio_toolkit;
 mod autostart;
 mod catalog;
+mod chat_text;
 mod chinese_script;
 pub mod cli;
 mod clipboard;
@@ -698,6 +699,8 @@ pub fn run(cli_args: CliArgs) {
             shortcut::start_overlay_positioning,
             shortcut::finish_overlay_positioning,
             shortcut::reset_overlay_position,
+            shortcut::change_remove_commas_setting,
+            shortcut::change_chat_abbreviations_setting,
             shortcut::change_post_process_enabled_setting,
             shortcut::change_experimental_enabled_setting,
             shortcut::change_post_process_base_url_setting,

@@ -13,6 +13,7 @@ import { ClipboardHandlingSetting } from "../ClipboardHandling";
 import { AutoSubmit } from "../AutoSubmit";
 import { OpenInputField } from "../OpenInputField";
 import { Capitalization } from "../Capitalization";
+import { ChatTextOptions } from "../ChatTextOptions";
 import { PostProcessingToggle } from "../PostProcessingToggle";
 import { AppendTrailingSpace } from "../AppendTrailingSpace";
 import { HistoryLimit } from "../HistoryLimit";
@@ -51,6 +52,7 @@ export const AdvancedSettings: React.FC = () => {
         <AutoSubmit descriptionMode="tooltip" grouped={true} />
         <OpenInputField descriptionMode="tooltip" grouped={true} />
         <Capitalization descriptionMode="tooltip" grouped={true} />
+        <ChatTextOptions descriptionMode="tooltip" grouped={true} />
       </SettingsGroup>
 
       <SettingsGroup title={t("settings.advanced.groups.transcription")}>

@@ -1111,6 +1111,24 @@ pub fn change_review_before_sending_setting(app: AppHandle, enabled: bool) -> Re
     Ok(())
 }
 
+#[tauri::command]
+#[specta::specta]
+pub fn change_remove_commas_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.remove_commas = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
+#[tauri::command]
+#[specta::specta]
+pub fn change_chat_abbreviations_setting(app: AppHandle, enabled: bool) -> Result<(), String> {
+    let mut settings = settings::get_settings(&app);
+    settings.chat_abbreviations = enabled;
+    settings::write_settings(&app, settings);
+    Ok(())
+}
+
 /// Shows the overlay so it can be dragged somewhere else.
 #[tauri::command]
 #[specta::specta]

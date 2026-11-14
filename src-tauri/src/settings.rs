@@ -542,6 +542,10 @@ pub struct AppSettings {
     pub overlay_theme: OverlayTheme,
     #[serde(default)]
     pub overlay_custom_position: Option<OverlayCustomPosition>,
+    #[serde(default)]
+    pub remove_commas: bool,
+    #[serde(default)]
+    pub chat_abbreviations: bool,
     #[serde(default = "default_post_process_enabled")]
     pub post_process_enabled: bool,
     #[serde(default = "default_post_process_provider_id")]
@@ -1151,6 +1155,8 @@ pub fn get_default_settings() -> AppSettings {
         game_shortcuts_ignore_modifiers: false,
         overlay_theme: OverlayTheme::default(),
         overlay_custom_position: None,
+        remove_commas: false,
+        chat_abbreviations: false,
         post_process_enabled: default_post_process_enabled(),
         post_process_provider_id: default_post_process_provider_id(),
         post_process_providers: default_post_process_providers(),
