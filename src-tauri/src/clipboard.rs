@@ -108,12 +108,7 @@ fn paste_via_clipboard(
             let paste_method = *paste_method;
             return with_enigo(app_handle, move |enigo| {
                 open_sequence.send(enigo)?;
-                match paste_method {
-                    PasteMethod::CtrlV => input::send_paste_ctrl_v(enigo, 100)?,
-                    PasteMethod::CtrlShiftV => input::send_paste_ctrl_shift_v(enigo, 100)?,
-                    PasteMethod::ShiftInsert => input::send_paste_shift_insert(enigo, 100)?,
-                    _ => return Err("Invalid paste method for clipboard paste".into()),
-                }
+                game_paste(enigo, paste_method)?;
                 after_paste.send(enigo)
             });
         }
@@ -890,16 +885,93 @@ fn tap_key(enigo: &mut Enigo, key: Key) -> Result<(), String> {
         .map_err(|e| format!("Failed to release {:?}: {}", key, e))
 }
 
-/// Presses Ctrl+Shift+`key` (the Chat Reviewer addon's keybindings).
-fn press_ctrl_shift(enigo: &mut Enigo, key: Key) -> Result<(), String> {
-    enigo
-        .key(Key::Control, Direction::Press)
-        .map_err(|e| format!("Failed to press Ctrl: {}", e))?;
-    let _ = enigo.key(Key::Shift, Direction::Press);
-    let result = tap_key(enigo, key);
-    let _ = enigo.key(Key::Shift, Direction::Release);
-    let _ = enigo.key(Key::Control, Direction::Release);
+/// Whether a modifier key is physically held down right now. Windows only;
+/// elsewhere it reports "not held", which keeps the previous behavior.
+fn modifier_held(key: Key) -> bool {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::UI::Input::KeyboardAndMouse::{
+            GetAsyncKeyState, VK_CONTROL, VK_LWIN, VK_MENU, VK_RWIN, VK_SHIFT,
+        };
+        let codes = match key {
+            Key::Control => vec![VK_CONTROL],
+            Key::Shift => vec![VK_SHIFT],
+            Key::Alt => vec![VK_MENU],
+            Key::Meta => vec![VK_LWIN, VK_RWIN],
+            _ => return false,
+        };
+        codes
+            .iter()
+            .any(|vk| unsafe { GetAsyncKeyState(vk.0 as i32) } as u16 & 0x8000 != 0)
+    }
+    #[cfg(not(target_os = "windows"))]
+    {
+        let _ = key;
+        false
+    }
+}
+
+/// Runs `action` with `modifiers` held, reusing any you're already holding:
+/// only the missing ones are pressed, and only those are released afterward.
+/// Releasing one of yours would make the game think you let go of it (e.g.
+/// Shift stops counting for your next spell while you're still holding it).
+fn with_modifiers(
+    enigo: &mut Enigo,
+    modifiers: &[Key],
+    action: impl FnOnce(&mut Enigo) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut pressed = Vec::new();
+    for &modifier in modifiers {
+        if modifier_held(modifier) {
+            continue;
+        }
+        enigo
+            .key(modifier, Direction::Press)
+            .map_err(|e| format!("Failed to press {:?}: {}", modifier, e))?;
+        pressed.push(modifier);
+    }
+    let result = action(enigo);
+    for modifier in pressed.into_iter().rev() {
+        let _ = enigo.key(modifier, Direction::Release);
+    }
     result
+}
+
+/// Presses Ctrl+Shift+`key` (the Chat Reviewer addon's keybindings), leaving
+/// held modifiers alone.
+fn press_ctrl_shift(enigo: &mut Enigo, key: Key) -> Result<(), String> {
+    with_modifiers(enigo, &[Key::Control, Key::Shift], |enigo| {
+        tap_key(enigo, key)
+    })
+}
+
+/// The paste shortcut for game chat. On Windows it leaves held modifiers
+/// alone (see `with_modifiers`); elsewhere it uses the regular paste keys.
+fn game_paste(enigo: &mut Enigo, paste_method: PasteMethod) -> Result<(), String> {
+    #[cfg(target_os = "windows")]
+    {
+        let (modifiers, key): (&[Key], Key) = match paste_method {
+            PasteMethod::CtrlV => (&[Key::Control], Key::Other(0x56)), // VK_V
+            PasteMethod::CtrlShiftV => (&[Key::Control, Key::Shift], Key::Other(0x56)),
+            PasteMethod::ShiftInsert => (&[Key::Shift], Key::Insert),
+            _ => return Err("Invalid paste method for clipboard paste".into()),
+        };
+        with_modifiers(enigo, modifiers, |enigo| {
+            enigo
+                .key(key, Direction::Click)
+                .map_err(|e| format!("Failed to press paste key: {}", e))?;
+            // Same hold as the regular paste, so the target reads it.
+            std::thread::sleep(Duration::from_millis(100));
+            Ok(())
+        })
+    }
+    #[cfg(not(target_os = "windows"))]
+    match paste_method {
+        PasteMethod::CtrlV => input::send_paste_ctrl_v(enigo, 100),
+        PasteMethod::CtrlShiftV => input::send_paste_ctrl_shift_v(enigo, 100),
+        PasteMethod::ShiftInsert => input::send_paste_shift_insert(enigo, 100),
+        _ => Err("Invalid paste method for clipboard paste".into()),
+    }
 }
 
 /// Presses Ctrl+Shift+`key`, which the Chat Reviewer addon binds to "send
@@ -996,17 +1068,13 @@ impl OpenSequence {
 /// letter key (A) makes games think a held movement key was let go, stopping
 /// e.g. a strafe; Home is practically never bound in games.
 fn send_select_to_start(enigo: &mut Enigo) -> Result<(), String> {
-    enigo
-        .key(Key::Shift, Direction::Press)
-        .map_err(|e| format!("Failed to press Shift: {}", e))?;
-    let click = enigo
-        .key(Key::Home, Direction::Click)
-        .map_err(|e| format!("Failed to click Home: {}", e));
-    std::thread::sleep(Duration::from_millis(30));
-    enigo
-        .key(Key::Shift, Direction::Release)
-        .map_err(|e| format!("Failed to release Shift: {}", e))?;
-    click
+    with_modifiers(enigo, &[Key::Shift], |enigo| {
+        enigo
+            .key(Key::Home, Direction::Click)
+            .map_err(|e| format!("Failed to click Home: {}", e))?;
+        std::thread::sleep(Duration::from_millis(30));
+        Ok(())
+    })
 }
 
 /// Applies the capitalization setting to normal transcriptions.
